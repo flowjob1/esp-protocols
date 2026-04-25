@@ -9,8 +9,16 @@ It is possible to create a modem handle in many different ways:
 
     -Create a generic DCE or a templated DCE_T of a specific module (this could be one of the supported modules or a user defined module)
 "
-
-Setze den implementierungsplan "docs/esp_modem/a7670e-custom/Implementierungsspezifikation__A7670E_Custom_esp_modem_Module_v2.md" vollständig um, indem du schrittweise jeden punkt abarbeitest, und anschließend versuchst das
+Ziele:
+- docs/esp_modem/a7670e-custom/Implementierungsspezifikation__A7670E_Custom_esp_modem_Module_v2.md ist vollständig implementiert (in mehreren schritten!)
 - alle angehängten commands können über die esp-modem lib gesendet werden, es sind alle parameter der commands funktional und korrekt implementiert, inkl mqtt
 - es ist für keinen use case, der die AT-commands nutzt, nötig, eine eigene funktion zu schreiben, die direkt AT-commands sendet, weil alles vollständig über die lib laufen kann
 - die implementierung in der modem-lib entspricht vollständig den anforderungen der esp-modem-lib, vollständige docs sind hier https://docs.espressif.com/projects/esp-protocols/esp_modem/docs/latest/index.html
+
+
+
+Setze den implementierungsplan "docs/esp_modem/a7670e-custom/Implementierungsspezifikation__A7670E_Custom_esp_modem_Module_v2.md" vollständig um, indem du schrittweise jeden punkt abarbeitest, und anschließend versuchst das Modul zu bauen und zu testen. Dokumentiere jeden Schritt sorgfältig, damit die Implementierung nachvollziehbar ist und die Anforderungen der esp-modem-lib erfüllt werden. Achte darauf, dass alle Funktionen korrekt implementiert sind und die AT-commands wie erwartet funktionieren.
+Wenn du Fragen hast, zögere nicht, sie zu stellen, damit die Implementierung erfolgreich abgeschlossen werden kann.
+- Nach Änderungen, die zu einem erfolgreichen Build führen sollten, führe aus:
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Flo\CLionProjects\esp-protocols\components\esp_modem\scripts\generate_windows.ps1" "*files-tobuild*"
+mit *filestobuild* als Platzhalter für die geänderten Dateien, z.B. "generate/include/esp_modem_api.h" oder "generate/include/esp_modem_api.h" "C:\Users\Flo\CLionProjects\esp-protocols\components\esp_modem". Das Skript führt einen Build durch und prüft, ob die Änderungen zu einem erfolgreichen Build führen.
