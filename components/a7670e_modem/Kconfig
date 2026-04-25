@@ -1,0 +1,16 @@
+menu "A7670E Modem Configuration"
+
+    config A7670E_MODEM_ENABLED
+        bool "Enable A7670E Custom Module"
+        default y
+        help
+            Enable the SIMCom A7670E custom module for esp_modem.
+            This module provides AT-command interface support.
+
+    config A7670E_URC_TASK_STACK_SIZE
+        int "URC Handler Task Stack Size"
+        default 4096
+        help
+            Stack size for the URC handler task.
+
+endmenu

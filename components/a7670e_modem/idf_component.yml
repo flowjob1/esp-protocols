@@ -1,0 +1,13 @@
+version: "1.0.0"
+description: "Custom A7670E Modem Module for esp_modem - AT-command interface only"
+url: "https://github.com/espressif/esp-protocols"
+
+dependencies:
+  esp_modem: "*"
+  esp_event: "*"
+  freertos: "*"
+
+metadata:
+  category: "Connectivity"
+  lifecycle: "experimental"
+
