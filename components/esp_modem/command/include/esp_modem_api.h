@@ -25,7 +25,7 @@ esp_err_t esp_modem_sync(esp_modem_dce_t *dce);
  * @param[out] act access technology
  * @return OK, FAIL or TIMEOUT
  */
-esp_err_t esp_modem_get_operator_name(esp_modem_dce_t *dce, char *name, int *act);
+esp_err_t esp_modem_get_operator_name(esp_modem_dce_t *dce, char* name, int* act);
 /**
  * @brief Stores current user profile
  * @return OK, FAIL or TIMEOUT
@@ -36,7 +36,7 @@ esp_err_t esp_modem_store_profile(esp_modem_dce_t *dce);
  * @param[in] pin Pin
  * @return OK, FAIL or TIMEOUT
  */
-esp_err_t esp_modem_set_pin(esp_modem_dce_t *dce, const char *pin);
+esp_err_t esp_modem_set_pin(esp_modem_dce_t *dce, const char* pin);
 /**
  * @brief Execute the supplied AT command in raw mode (doesn't append '\r' to command, returns everything)
  * @param[in] cmd String command that's send to DTE
@@ -46,7 +46,7 @@ esp_err_t esp_modem_set_pin(esp_modem_dce_t *dce, const char *pin);
  * @param[in] timeout AT command timeout in milliseconds
  * @return OK, FAIL or TIMEOUT
  */
-esp_err_t esp_modem_at_raw(esp_modem_dce_t *dce, const char *cmd, char *out, const char *pass, const char *fail, int timeout);
+esp_err_t esp_modem_at_raw(esp_modem_dce_t *dce, const char* cmd, char* out, const char* pass, const char* fail, int timeout);
 /**
  * @brief Execute the supplied AT command
  * @param[in] cmd AT command
@@ -54,13 +54,13 @@ esp_err_t esp_modem_at_raw(esp_modem_dce_t *dce, const char *cmd, char *out, con
  * @param[in] timeout AT command timeout in milliseconds
  * @return OK, FAIL or TIMEOUT
  */
-esp_err_t esp_modem_at(esp_modem_dce_t *dce, const char *cmd, char *out, int timeout);
+esp_err_t esp_modem_at(esp_modem_dce_t *dce, const char* cmd, char* out, int timeout);
 /**
  * @brief Checks if the SIM needs a PIN
  * @param[out] pin_ok true if the SIM card doesn't need a PIN to unlock
  * @return OK, FAIL or TIMEOUT
  */
-esp_err_t esp_modem_read_pin(esp_modem_dce_t *dce, bool *pin_ok);
+esp_err_t esp_modem_read_pin(esp_modem_dce_t *dce, bool* pin_ok);
 /**
  * @brief Sets echo mode
  * @param[in] echo_on true if echo mode on (repeats the commands)
@@ -84,7 +84,7 @@ esp_err_t esp_modem_sms_character_set(esp_modem_dce_t *dce);
  * @param[in] message Text message to be sent
  * @return OK, FAIL or TIMEOUT
  */
-esp_err_t esp_modem_send_sms(esp_modem_dce_t *dce, const char *number, const char *message);
+esp_err_t esp_modem_send_sms(esp_modem_dce_t *dce, const char* number, const char* message);
 /**
  * @brief Resumes data mode (Switches back to the data mode, which was temporarily suspended)
  * @return OK, FAIL or TIMEOUT
@@ -95,7 +95,7 @@ esp_err_t esp_modem_resume_data_mode(esp_modem_dce_t *dce);
  * @param[in] p1 PdP context struct to setup modem cellular connection
  * @return OK, FAIL or TIMEOUT
  */
-esp_err_t esp_modem_set_pdp_context(esp_modem_dce_t *dce, esp_modem_PdpContext_t *pdp);
+esp_err_t esp_modem_set_pdp_context(esp_modem_dce_t *dce, esp_modem_PdpContext_t* pdp);
 /**
  * @brief Switches to the command mode
  * @return OK, FAIL or TIMEOUT
@@ -111,19 +111,19 @@ esp_err_t esp_modem_set_cmux(esp_modem_dce_t *dce);
  * @param[out] imsi Module's IMSI number
  * @return OK, FAIL or TIMEOUT
  */
-esp_err_t esp_modem_get_imsi(esp_modem_dce_t *dce, char *imsi);
+esp_err_t esp_modem_get_imsi(esp_modem_dce_t *dce, char* imsi);
 /**
  * @brief Reads the IMEI number
  * @param[out] imei Module's IMEI number
  * @return OK, FAIL or TIMEOUT
  */
-esp_err_t esp_modem_get_imei(esp_modem_dce_t *dce, char *imei);
+esp_err_t esp_modem_get_imei(esp_modem_dce_t *dce, char* imei);
 /**
  * @brief Reads the module name
  * @param[out] name module name
  * @return OK, FAIL or TIMEOUT
  */
-esp_err_t esp_modem_get_module_name(esp_modem_dce_t *dce, char *name);
+esp_err_t esp_modem_get_module_name(esp_modem_dce_t *dce, char* name);
 /**
  * @brief Sets the modem to data mode
  * @return OK, FAIL or TIMEOUT
@@ -135,7 +135,7 @@ esp_err_t esp_modem_set_data_mode(esp_modem_dce_t *dce);
  * @param[out] ber channel bit error rate
  * @return OK, FAIL or TIMEOUT
  */
-esp_err_t esp_modem_get_signal_quality(esp_modem_dce_t *dce, int *rssi, int *ber);
+esp_err_t esp_modem_get_signal_quality(esp_modem_dce_t *dce, int* rssi, int* ber);
 /**
  * @brief Sets HW control flow
  * @param[in] dce_flow 0=none, 2=RTS hw flow control of DCE
@@ -155,7 +155,7 @@ esp_err_t esp_modem_hang_up(esp_modem_dce_t *dce);
  * @param[out] bcl 1-100% battery capacity, -1-Not available
  * @return OK, FAIL or TIMEOUT
  */
-esp_err_t esp_modem_get_battery_status(esp_modem_dce_t *dce, int *voltage, int *bcs, int *bcl);
+esp_err_t esp_modem_get_battery_status(esp_modem_dce_t *dce, int* voltage, int* bcs, int* bcl);
 /**
  * @brief Power down the module
  * @return OK, FAIL or TIMEOUT
@@ -187,7 +187,7 @@ esp_err_t esp_modem_set_baud(esp_modem_dce_t *dce, int baud);
  * @param[in] oper the operator to connect to
  * @return OK, FAIL or TIMEOUT
  */
-esp_err_t esp_modem_set_operator(esp_modem_dce_t *dce, int mode, int format, const char *oper);
+esp_err_t esp_modem_set_operator(esp_modem_dce_t *dce, int mode, int format, const char* oper);
 /**
  * @brief Attach or detach from the GPRS service
  * @param[in] state 1-attach 0-detach
@@ -199,7 +199,7 @@ esp_err_t esp_modem_set_network_attachment_state(esp_modem_dce_t *dce, int state
  * @param[out] state 1-attached 0-detached
  * @return OK, FAIL or TIMEOUT
  */
-esp_err_t esp_modem_get_network_attachment_state(esp_modem_dce_t *dce, int *state);
+esp_err_t esp_modem_get_network_attachment_state(esp_modem_dce_t *dce, int* state);
 /**
  * @brief What mode the radio should be set to
  * @param[in] state state 1-full 0-minimum ...
@@ -211,7 +211,7 @@ esp_err_t esp_modem_set_radio_state(esp_modem_dce_t *dce, int state);
  * @param[out] state 1-full 0-minimum ...
  * @return OK, FAIL or TIMEOUT
  */
-esp_err_t esp_modem_get_radio_state(esp_modem_dce_t *dce, int *state);
+esp_err_t esp_modem_get_radio_state(esp_modem_dce_t *dce, int* state);
 /**
  * @brief Set network mode
  * @param[in] mode preferred mode
@@ -231,13 +231,13 @@ esp_err_t esp_modem_set_preferred_mode(esp_modem_dce_t *dce, int mode);
  * @param[in] size size of teh bands bitmap
  * @return OK, FAIL or TIMEOUT
  */
-esp_err_t esp_modem_set_network_bands(esp_modem_dce_t *dce, const char *mode, const int *bands, int size);
+esp_err_t esp_modem_set_network_bands(esp_modem_dce_t *dce, const char* mode, const int* bands, int size);
 /**
  * @brief Show network system mode
  * @param[out] mode current network mode
  * @return OK, FAIL or TIMEOUT
  */
-esp_err_t esp_modem_get_network_system_mode(esp_modem_dce_t *dce, int *mode);
+esp_err_t esp_modem_get_network_system_mode(esp_modem_dce_t *dce, int* mode);
 /**
  * @brief GNSS power control
  * @param[out] mode power mode (0 - off, 1 - on)
@@ -249,13 +249,13 @@ esp_err_t esp_modem_set_gnss_power_mode(esp_modem_dce_t *dce, int mode);
  * @param[out] mode power mode (0 - off, 1 - on)
  * @return OK, FAIL or TIMEOUT
  */
-esp_err_t esp_modem_get_gnss_power_mode(esp_modem_dce_t *dce, int *mode);
+esp_err_t esp_modem_get_gnss_power_mode(esp_modem_dce_t *dce, int* mode);
 /**
  * @brief Configure PSM
  * @param[in] mode psm mode (0 - off, 1 - on, 2 - off & discard stored params)
  * @return OK, FAIL or TIMEOUT
  */
-esp_err_t esp_modem_config_psm(esp_modem_dce_t *dce, int mode, const char *tau, const char *active_time);
+esp_err_t esp_modem_config_psm(esp_modem_dce_t *dce, int mode, const char* tau, const char* active_time);
 /**
  * @brief Configure CEREG urc
  * @param[in] value
@@ -282,7 +282,7 @@ esp_err_t esp_modem_config_network_registration_urc(esp_modem_dce_t *dce, int va
  *  state = 9 - Registered for CSFB not preferred, home network
  *  state = 10 - Registered for CSFB not preferred, roaming
  */
-esp_err_t esp_modem_get_network_registration_state(esp_modem_dce_t *dce, int *state);
+esp_err_t esp_modem_get_network_registration_state(esp_modem_dce_t *dce, int* state);
 /**
  *  @brief Configures the mobile termination error (+CME ERROR)
  *  @param[in] mode The form of the final result code
@@ -308,7 +308,7 @@ esp_err_t esp_modem_config_mobile_termination_error(esp_modem_dce_t *dce, int mo
  * @param[in] edrx_value nible string containing encoded eDRX time
  * @param[in] ptw_value nible string containing encoded Paging Time Window
  */
-esp_err_t esp_modem_config_edrx(esp_modem_dce_t *dce, int mode, int access_technology, const char *edrx_value);
+esp_err_t esp_modem_config_edrx(esp_modem_dce_t *dce, int mode, int access_technology, const char* edrx_value);
 //  --- ESP-MODEM command module ends here ---
 
 #ifdef __cplusplus

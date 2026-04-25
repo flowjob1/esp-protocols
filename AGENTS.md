@@ -1,0 +1,38 @@
+---
+apply: always
+---
+
+# AGENTS.md
+
+## General targets
+Ich möchte einen "advanced use case" für den esp-idf v6.0 component "esp_modem" von https://github.com/espressif/esp-protocols/tree/master/components/esp_modem für meinen esp32 erstellen, da ich ein Simcom A7670E Modem über UART nutzen will und die standardmässig verfügbaren module SIM7600, SIM7070, SIM7000, BG96, SIM800 und SQNGM02S nicht 100% für mein Modem passen.
+Da ich für mein Projekt nur den seriellen AT+Command Modus nutze und keine ppp Verbindug aufbauen will, reicht laut der dokumentation unter https://docs.espressif.com/projects/esp-protocols/esp_modem/docs/latest/advanced_api.html#custom-instantiation-with-dce-factory "or build the module only (in case the application will only use AT command interface)" ein "modul only" zu bauen:
+"
+It is possible to create a modem handle in many different ways:
+
+    -Build a DCE on top a generic module, user defined module or build the module only (in case the application will only use AT command interface)
+
+    -Create the DCE as a shared, unique or a vanilla pointer
+
+    -Create a generic DCE or a templated DCE_T of a specific module (this could be one of the supported modules or a user defined module)
+"
+
+Setze den implementierungsplan "docs/esp_modem/a7670e-custom/Implementierungsspezifikation__A7670E_Custom_esp_modem_Module_v2.md" vollständig um, indem du schrittweise jeden punkt abarbeitest, und anschließend versuchst das
+- alle angehängten commands können über die esp-modem lib gesendet werden, es sind alle parameter der commands funktional und korrekt implementiert, inkl mqtt
+- es ist für keinen use case, der die AT-commands nutzt, nötig, eine eigene funktion zu schreiben, die direkt AT-commands sendet, weil alles vollständig über die lib laufen kann
+- die implementierung in der modem-lib entspricht vollständig den anforderungen der esp-modem-lib, vollständige docs sind hier https://docs.espressif.com/projects/esp-protocols/esp_modem/docs/latest/index.html
+
+
+## 1) Generelle Vorgaben und Coding-Regeln
+- die Entwicklung läuft auf einem Windows-System. Nutze WIndows Befehle, rg/ripgrep ist aber vorhanden.
+- Verwende für sämtliche Texte im Projekt ausschließlich "normale" Zeichen. Verwende NIEMALS Emojis oder andere Arten von Symbolen.
+- Verwende für ESP32 Code keine `delay()` Funktionen; verwende stattdessen nicht-blockierende Alternativen.
+- Kein Bloat: Halte Änderungen so kompakt wie möglich. Prüfe vor hinzufügen von neuem code oder funktionen immer, ob das ändern oder umbauen einer vorhandenen Funktion das Problem schon lösen kann.
+- Halte dich bei deinen Implementierungen immer an die Best Practices der ESP-Programmierung; achte insbesondere auf effiziente und ressourcensparende Umsetzungen.
+- Keine dynamischen Allokationen in Hotpaths/ISR.
+- Vermeide Adapter- und Wrapperfunktionen, baue bestehendes lieber um.
+
+## 2) Build-Checks (Pflicht nach Änderungen)
+- Nach Änderungen, die zu einem erfolgreichen Build führen sollten, führe aus:
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Flo\CLionProjects\esp-protocols\components\esp_modem\scripts\generate_windows.ps1" "*files-tobuild*"
+mit *filestobuild* als Platzhalter für die geänderten Dateien, z.B. "generate/include/esp_modem_api.h" oder "generate/include/esp_modem_api.h" "C:\Users\Flo\CLionProjects\esp-protocols\components\esp_modem". Das Skript führt einen Build durch und prüft, ob die Änderungen zu einem erfolgreichen Build führen.
