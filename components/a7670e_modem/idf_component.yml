@@ -4,10 +4,7 @@ url: "https://github.com/espressif/esp-protocols"
 
 dependencies:
   esp_modem: "*"
-  esp_event: "*"
-  freertos: "*"
 
 metadata:
   category: "Connectivity"
   lifecycle: "experimental"
-

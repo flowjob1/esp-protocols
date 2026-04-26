@@ -3,6 +3,7 @@ menu "A7670E Modem Configuration"
     config A7670E_MODEM_ENABLED
         bool "Enable A7670E Custom Module"
         default y
+        select ESP_MODEM_URC_HANDLER
         help
             Enable the SIMCom A7670E custom module for esp_modem.
             This module provides AT-command interface support.

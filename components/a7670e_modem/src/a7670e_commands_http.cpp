@@ -1,234 +1,311 @@
 #include "a7670e_module.hpp"
-#include <cstring>
+#include "a7670e_parse_utils.hpp"
 
 using namespace esp_modem;
 using namespace a7670e;
 using CR = command_result;
 
-// ── 16. HTTP(S) ──────────────────────────────────────────────────────────────
+namespace {
+
+CR ok_or_error(std::string_view response)
+{
+    if (response.find("OK") != std::string_view::npos) {
+        return CR::OK;
+    }
+    if (response.find("ERROR") != std::string_view::npos) {
+        return CR::FAIL;
+    }
+    return CR::TIMEOUT;
+}
+
+bool parse_http_action_line(std::string_view line, HttpActionResult &result)
+{
+    const auto fields = detail::split_csv(line);
+    if (fields.size() < 3) {
+        return false;
+    }
+
+    int method = 0;
+    int status = 0;
+    int length = 0;
+    if (!detail::parse_integer(fields[0], method) ||
+            !detail::parse_integer(fields[1], status) ||
+            !detail::parse_integer(fields[2], length)) {
+        return false;
+    }
+
+    result.method = static_cast<HttpMethod>(method);
+    result.status_code = status;
+    result.data_len = length;
+    return true;
+}
+
+bool parse_http_errcode(std::string_view line, int &errcode)
+{
+    const auto fields = detail::split_csv(line);
+    return !fields.empty() && detail::parse_integer(fields[0], errcode);
+}
+
+bool parse_http_init_term(std::string_view response, std::string_view prefix, int expected_cid, int &errcode)
+{
+    const auto line = detail::find_line(response, prefix);
+    if (line.empty()) {
+        return false;
+    }
+
+    const auto fields = detail::split_csv(line.substr(prefix.size()));
+    if (fields.size() < 2) {
+        return false;
+    }
+
+    int cid = -1;
+    return detail::parse_integer(fields[0], errcode) &&
+           detail::parse_integer(fields[1], cid) &&
+           cid == expected_cid;
+}
+
+} // namespace
 
 CR A7670E::http_init(int cid)
 {
-    std::string cmd;
-    if (cid >= 0) {
-        cmd = "AT+HTTPINIT=" + std::to_string(cid) + "\r";
-    } else {
-        cmd = "AT+HTTPINIT\r";
-    }
+    const std::string cmd = cid >= 0 ? "AT+HTTPINIT=" + std::to_string(cid) + "\r" : "AT+HTTPINIT\r";
 
-    return command(cmd, [](uint8_t *d, size_t l) -> CR {
-        std::string_view r(reinterpret_cast<char*>(d), l);
-        if (r.find("+HTTPINIT:") != std::string_view::npos) {
-            // Success with parameter
-            return CR::OK;
+    return dte->command(cmd, [cid](uint8_t *d, size_t l) -> CR {
+        const std::string_view response(reinterpret_cast<char *>(d), l);
+        if (cid >= 0) {
+            int errcode = -1;
+            if (parse_http_init_term(response, "+HTTPINIT:", cid, errcode)) {
+                return errcode == 0 ? CR::OK : CR::FAIL;
+            }
         }
-        if (r.find("OK")    != std::string_view::npos) return CR::OK;
-        if (r.find("ERROR") != std::string_view::npos) {
-            // Ignore ERROR - might be from previous session
-            if (r.find("OK") != std::string_view::npos) return CR::OK;
+        if (response.find("ERROR") != std::string_view::npos) {
             return CR::FAIL;
         }
-        return CR::AGAIN;
+        if (cid < 0 && response.find("OK") != std::string_view::npos) {
+            return CR::OK;
+        }
+        return CR::TIMEOUT;
     }, 120000);
 }
 
 CR A7670E::http_term(int cid)
 {
-    std::string cmd;
-    if (cid >= 0) {
-        cmd = "AT+HTTPTERM=" + std::to_string(cid) + "\r";
-    } else {
-        cmd = "AT+HTTPTERM\r";
-    }
+    const std::string cmd = cid >= 0 ? "AT+HTTPTERM=" + std::to_string(cid) + "\r" : "AT+HTTPTERM\r";
 
-    return command(cmd, [](uint8_t *d, size_t l) -> CR {
-        std::string_view r(reinterpret_cast<char*>(d), l);
-        if (r.find("OK")    != std::string_view::npos) return CR::OK;
-        if (r.find("ERROR") != std::string_view::npos) return CR::FAIL;
-        return CR::AGAIN;
+    return dte->command(cmd, [cid](uint8_t *d, size_t l) -> CR {
+        const std::string_view response(reinterpret_cast<char *>(d), l);
+        if (cid >= 0) {
+            int errcode = -1;
+            if (parse_http_init_term(response, "+HTTPTERM:", cid, errcode)) {
+                return errcode == 0 ? CR::OK : CR::FAIL;
+            }
+        }
+        if (response.find("ERROR") != std::string_view::npos) {
+            return CR::FAIL;
+        }
+        if (cid < 0 && response.find("OK") != std::string_view::npos) {
+            return CR::OK;
+        }
+        return CR::TIMEOUT;
     }, 120000);
 }
 
 CR A7670E::http_set_url(const std::string &url)
 {
-    std::string cmd = "AT+HTTPPARA=\"URL\",\"" + url + "\"\r";
-    return command(cmd, [](uint8_t *d, size_t l) -> CR {
-        std::string_view r(reinterpret_cast<char*>(d), l);
-        if (r.find("OK")    != std::string_view::npos) return CR::OK;
-        if (r.find("ERROR") != std::string_view::npos) return CR::FAIL;
-        return CR::AGAIN;
+    return dte->command("AT+HTTPPARA=\"URL\",\"" + url + "\"\r", [](uint8_t *d, size_t l) -> CR {
+        return ok_or_error(std::string_view(reinterpret_cast<char *>(d), l));
     }, 120000);
 }
 
 CR A7670E::http_set_connect_timeout(int sec)
 {
-    std::string cmd = "AT+HTTPPARA=\"CONNECTTO\"," + std::to_string(sec) + "\r";
-    return command(cmd, [](uint8_t *d, size_t l) -> CR {
-        std::string_view r(reinterpret_cast<char*>(d), l);
-        if (r.find("OK")    != std::string_view::npos) return CR::OK;
-        if (r.find("ERROR") != std::string_view::npos) return CR::FAIL;
-        return CR::AGAIN;
+    return dte->command("AT+HTTPPARA=\"CONNECTTO\"," + std::to_string(sec) + "\r", [](uint8_t *d, size_t l) -> CR {
+        return ok_or_error(std::string_view(reinterpret_cast<char *>(d), l));
     }, 120000);
 }
 
 CR A7670E::http_set_recv_timeout(int sec)
 {
-    std::string cmd = "AT+HTTPPARA=\"RECVTO\"," + std::to_string(sec) + "\r";
-    return command(cmd, [](uint8_t *d, size_t l) -> CR {
-        std::string_view r(reinterpret_cast<char*>(d), l);
-        if (r.find("OK")    != std::string_view::npos) return CR::OK;
-        if (r.find("ERROR") != std::string_view::npos) return CR::FAIL;
-        return CR::AGAIN;
+    return dte->command("AT+HTTPPARA=\"RECVTO\"," + std::to_string(sec) + "\r", [](uint8_t *d, size_t l) -> CR {
+        return ok_or_error(std::string_view(reinterpret_cast<char *>(d), l));
     }, 120000);
 }
 
 CR A7670E::http_set_content_type(const std::string &ct)
 {
-    std::string cmd = "AT+HTTPPARA=\"CONTENT\",\"" + ct + "\"\r";
-    return command(cmd, [](uint8_t *d, size_t l) -> CR {
-        std::string_view r(reinterpret_cast<char*>(d), l);
-        if (r.find("OK")    != std::string_view::npos) return CR::OK;
-        if (r.find("ERROR") != std::string_view::npos) return CR::FAIL;
-        return CR::AGAIN;
+    return dte->command("AT+HTTPPARA=\"CONTENT\",\"" + ct + "\"\r", [](uint8_t *d, size_t l) -> CR {
+        return ok_or_error(std::string_view(reinterpret_cast<char *>(d), l));
     }, 120000);
 }
 
 CR A7670E::http_set_accept(const std::string &accept)
 {
-    std::string cmd = "AT+HTTPPARA=\"ACCEPT\",\"" + accept + "\"\r";
-    return command(cmd, [](uint8_t *d, size_t l) -> CR {
-        std::string_view r(reinterpret_cast<char*>(d), l);
-        if (r.find("OK")    != std::string_view::npos) return CR::OK;
-        if (r.find("ERROR") != std::string_view::npos) return CR::FAIL;
-        return CR::AGAIN;
+    return dte->command("AT+HTTPPARA=\"ACCEPT\",\"" + accept + "\"\r", [](uint8_t *d, size_t l) -> CR {
+        return ok_or_error(std::string_view(reinterpret_cast<char *>(d), l));
     }, 120000);
 }
 
 CR A7670E::http_set_ssl_cfg(int sslcfg_id)
 {
-    std::string cmd = "AT+HTTPPARA=\"SSLCFG\"," + std::to_string(sslcfg_id) + "\r";
-    return command(cmd, [](uint8_t *d, size_t l) -> CR {
-        std::string_view r(reinterpret_cast<char*>(d), l);
-        if (r.find("OK")    != std::string_view::npos) return CR::OK;
-        if (r.find("ERROR") != std::string_view::npos) return CR::FAIL;
-        return CR::AGAIN;
+    return dte->command("AT+HTTPPARA=\"SSLCFG\"," + std::to_string(sslcfg_id) + "\r", [](uint8_t *d, size_t l) -> CR {
+        return ok_or_error(std::string_view(reinterpret_cast<char *>(d), l));
     }, 120000);
 }
 
 CR A7670E::http_set_user_data(const std::string &data)
 {
-    std::string cmd = "AT+HTTPPARA=\"USERDATA\",\"" + data + "\"\r";
-    return command(cmd, [](uint8_t *d, size_t l) -> CR {
-        std::string_view r(reinterpret_cast<char*>(d), l);
-        if (r.find("OK")    != std::string_view::npos) return CR::OK;
-        if (r.find("ERROR") != std::string_view::npos) return CR::FAIL;
-        return CR::AGAIN;
+    return dte->command("AT+HTTPPARA=\"USERDATA\",\"" + data + "\"\r", [](uint8_t *d, size_t l) -> CR {
+        return ok_or_error(std::string_view(reinterpret_cast<char *>(d), l));
     }, 120000);
 }
 
 CR A7670E::http_set_read_mode(int mode)
 {
-    std::string cmd = "AT+HTTPPARA=\"READMODE\"," + std::to_string(mode) + "\r";
-    return command(cmd, [](uint8_t *d, size_t l) -> CR {
-        std::string_view r(reinterpret_cast<char*>(d), l);
-        if (r.find("OK")    != std::string_view::npos) return CR::OK;
-        if (r.find("ERROR") != std::string_view::npos) return CR::FAIL;
-        return CR::AGAIN;
+    return dte->command("AT+HTTPPARA=\"READMODE\"," + std::to_string(mode) + "\r", [](uint8_t *d, size_t l) -> CR {
+        return ok_or_error(std::string_view(reinterpret_cast<char *>(d), l));
     }, 120000);
 }
 
 CR A7670E::http_action(HttpMethod method, HttpActionResult &result)
 {
-    std::string cmd = "AT+HTTPACTION=" + std::to_string(static_cast<int>(method)) + "\r";
+    const std::string cmd = "AT+HTTPACTION=" + std::to_string(static_cast<int>(method)) + "\r";
 
-    return command(cmd, [&](uint8_t *d, size_t l) -> CR {
-        std::string_view r(reinterpret_cast<char*>(d), l);
-        auto pos = r.find("+HTTPACTION:");
-        if (pos != std::string_view::npos) {
-            int method_int, status, len;
-            sscanf(r.data() + pos, "+HTTPACTION: %d,%d,%d", &method_int, &status, &len);
-            result.method = static_cast<HttpMethod>(method_int);
-            result.status_code = status;
-            result.data_len = len;
+    return dte->command(cmd, [&](uint8_t *d, size_t l) -> CR {
+        const std::string_view response(reinterpret_cast<char *>(d), l);
+        const auto line = detail::find_line(response, "+HTTPACTION:");
+        if (!line.empty()) {
+            if (!parse_http_action_line(line.substr(std::string_view("+HTTPACTION:").size()), result)) {
+                return CR::FAIL;
+            }
             return CR::OK;
         }
-        if (r.find("OK")    != std::string_view::npos) return CR::AGAIN;
-        if (r.find("ERROR") != std::string_view::npos) return CR::FAIL;
-        return CR::AGAIN;
+        if (response.find("ERROR") != std::string_view::npos) {
+            return CR::FAIL;
+        }
+        return CR::TIMEOUT;
     }, 120000);
 }
 
 CR A7670E::http_head(std::string &header_data)
 {
     header_data.clear();
-    return command("AT+HTTPHEAD\r", [&](uint8_t *d, size_t l) -> CR {
-        std::string_view r(reinterpret_cast<char*>(d), l);
-        auto pos = r.find("+HTTPHEAD:");
-        if (pos != std::string_view::npos) {
-            int len = 0;
-            sscanf(r.data() + pos, "+HTTPHEAD: %d", &len);
-            // TODO: implement header data extraction
+    int expected_len = -1;
+    size_t payload_start = std::string_view::npos;
+    bool payload_ready = false;
+
+    return dte->command("AT+HTTPHEAD\r", [&](uint8_t *d, size_t l) -> CR {
+        const std::string_view response(reinterpret_cast<char *>(d), l);
+
+        if (expected_len < 0) {
+            const auto marker_pos = response.find("+HTTPHEAD:");
+            if (marker_pos != std::string_view::npos) {
+                const auto marker_end = response.find('\n', marker_pos);
+                if (marker_end == std::string_view::npos) {
+                    return CR::TIMEOUT;
+                }
+                const auto line = detail::trim_ascii(response.substr(marker_pos, marker_end - marker_pos));
+                if (!detail::parse_integer(line.substr(std::string_view("+HTTPHEAD:").size()), expected_len)) {
+                    return CR::FAIL;
+                }
+                payload_start = marker_end + 1;
+            }
         }
-        if (r.find("OK")    != std::string_view::npos) return CR::OK;
-        if (r.find("ERROR") != std::string_view::npos) return CR::FAIL;
-        return CR::AGAIN;
+
+        if (expected_len >= 0 && !payload_ready) {
+            if (response.size() < payload_start + static_cast<size_t>(expected_len)) {
+                return CR::TIMEOUT;
+            }
+            header_data.assign(response.data() + payload_start, static_cast<size_t>(expected_len));
+            payload_ready = true;
+        }
+
+        if (response.find("ERROR") != std::string_view::npos) {
+            return CR::FAIL;
+        }
+        if (payload_ready && response.find("OK", payload_start + static_cast<size_t>(expected_len)) != std::string_view::npos) {
+            return CR::OK;
+        }
+        return CR::TIMEOUT;
     }, 120000);
 }
 
 CR A7670E::http_read(int start_offset, int byte_size, std::string &data)
 {
-    std::string cmd = "AT+HTTPREAD=" + std::to_string(start_offset) + "," +
-                      std::to_string(byte_size) + "\r";
+    const std::string cmd = "AT+HTTPREAD=" + std::to_string(start_offset) + "," + std::to_string(byte_size) + "\r";
     data.clear();
 
-    return command(cmd, [&](uint8_t *d, size_t l) -> CR {
-        std::string_view r(reinterpret_cast<char*>(d), l);
-        auto pos = r.find("+HTTPREAD:");
-        if (pos != std::string_view::npos) {
-            int len = 0;
-            sscanf(r.data() + pos, "+HTTPREAD: %d", &len);
-            // Extract data (simplified - actual implementation depends on response format)
-            auto data_start = r.find('\n', pos);
-            if (data_start != std::string_view::npos) {
-                data_start++;
-                auto data_end = r.find("+HTTPREAD: 0", data_start);
-                if (data_end != std::string_view::npos) {
-                    data.append(r.data() + data_start, data_end - data_start);
+    int expected_len = -1;
+    size_t payload_start = std::string_view::npos;
+    bool payload_ready = false;
+
+    return dte->command(cmd, [&](uint8_t *d, size_t l) -> CR {
+        const std::string_view response(reinterpret_cast<char *>(d), l);
+
+        if (expected_len < 0) {
+            const auto marker_pos = response.find("+HTTPREAD:");
+            if (marker_pos != std::string_view::npos) {
+                const auto marker_end = response.find('\n', marker_pos);
+                if (marker_end == std::string_view::npos) {
+                    return CR::TIMEOUT;
                 }
+                const auto line = detail::trim_ascii(response.substr(marker_pos, marker_end - marker_pos));
+                if (!detail::parse_integer(line.substr(std::string_view("+HTTPREAD:").size()), expected_len)) {
+                    return CR::FAIL;
+                }
+                payload_start = marker_end + 1;
             }
         }
-        if (r.find("+HTTPREAD: 0") != std::string_view::npos) {
-            if (r.find("OK") != std::string_view::npos) return CR::OK;
+
+        if (expected_len >= 0 && !payload_ready) {
+            if (response.size() < payload_start + static_cast<size_t>(expected_len)) {
+                return CR::TIMEOUT;
+            }
+            data.assign(response.data() + payload_start, static_cast<size_t>(expected_len));
+            payload_ready = true;
         }
-        if (r.find("ERROR") != std::string_view::npos) return CR::FAIL;
-        return CR::AGAIN;
+
+        const auto done_pos = response.find("+HTTPREAD: 0", payload_ready ? payload_start + static_cast<size_t>(expected_len) : 0);
+        if (response.find("ERROR") != std::string_view::npos) {
+            return CR::FAIL;
+        }
+        if (payload_ready && expected_len == 0 && response.find("OK", payload_start) != std::string_view::npos) {
+            return CR::OK;
+        }
+        if (payload_ready && done_pos != std::string_view::npos && response.find("OK", done_pos) != std::string_view::npos) {
+            return CR::OK;
+        }
+        return CR::TIMEOUT;
     }, 120000);
 }
 
 CR A7670E::http_read_len(int &total_len)
 {
-    return command("AT+HTTPREAD?\r", [&](uint8_t *d, size_t l) -> CR {
-        std::string_view r(reinterpret_cast<char*>(d), l);
-        auto pos = r.find("+HTTPREAD: LEN,");
-        if (pos != std::string_view::npos) {
-            sscanf(r.data() + pos, "+HTTPREAD: LEN,%d", &total_len);
+    return dte->command("AT+HTTPREAD?\r", [&](uint8_t *d, size_t l) -> CR {
+        const std::string_view response(reinterpret_cast<char *>(d), l);
+        const auto line = detail::find_line(response, "+HTTPREAD:");
+        if (!line.empty()) {
+            const auto fields = detail::split_csv(line.substr(std::string_view("+HTTPREAD:").size()));
+            if (fields.size() < 2 || fields[0] != "LEN" || !detail::parse_integer(fields[1], total_len)) {
+                return CR::FAIL;
+            }
         }
-        if (r.find("OK")    != std::string_view::npos) return CR::OK;
-        if (r.find("ERROR") != std::string_view::npos) return CR::FAIL;
-        return CR::AGAIN;
+        if (response.find("OK") != std::string_view::npos) {
+            return CR::OK;
+        }
+        if (response.find("ERROR") != std::string_view::npos) {
+            return CR::FAIL;
+        }
+        return CR::TIMEOUT;
     }, 120000);
 }
 
-CR A7670E::http_data_input(const std::string &data, int timeout_sec)
+CR A7670E::http_data_input(const std::string &data, int timeout_ms)
 {
-    std::string cmd = "AT+HTTPDATA=" + std::to_string(data.size()) + "," +
-                      std::to_string(timeout_sec * 1000) + "\r";
-
-    return send_data_after_prompt(cmd, data, "OK", (timeout_sec + 10) * 1000);
+    const std::string cmd = "AT+HTTPDATA=" + std::to_string(data.size()) + "," + std::to_string(timeout_ms) + "\r";
+    return send_data_after_prompt(cmd, data, "OK", static_cast<uint32_t>(timeout_ms + 10000));
 }
 
-CR A7670E::http_post_file(const std::string &filename, int path,
-                           std::optional<HttpMethod> method, bool send_header)
+CR A7670E::http_post_file(const std::string &filename, int path, std::optional<HttpMethod> method, bool send_header)
 {
     std::string cmd = "AT+HTTPPOSTFILE=\"" + filename + "\"," + std::to_string(path);
     if (method.has_value()) {
@@ -239,33 +316,41 @@ CR A7670E::http_post_file(const std::string &filename, int path,
     }
     cmd += "\r";
 
-    return command(cmd, [](uint8_t *d, size_t l) -> CR {
-        std::string_view r(reinterpret_cast<char*>(d), l);
-        if (r.find("+HTTPPOSTFILE:") != std::string_view::npos) {
-            return CR::OK;
+    return dte->command(cmd, [](uint8_t *d, size_t l) -> CR {
+        const std::string_view response(reinterpret_cast<char *>(d), l);
+        const auto line = detail::find_line(response, "+HTTPPOSTFILE:");
+        if (!line.empty()) {
+            HttpActionResult result{};
+            return parse_http_action_line(line.substr(std::string_view("+HTTPPOSTFILE:").size()), result) ? CR::OK : CR::FAIL;
         }
-        if (r.find("OK")    != std::string_view::npos) return CR::AGAIN;
-        if (r.find("ERROR") != std::string_view::npos) return CR::FAIL;
-        return CR::AGAIN;
+        if (response.find("ERROR") != std::string_view::npos) {
+            return CR::FAIL;
+        }
+        return CR::TIMEOUT;
     }, 120000);
 }
 
 CR A7670E::http_read_file(const std::string &filename, int path)
 {
     std::string cmd = "AT+HTTPREADFILE=\"" + filename + "\"";
-    if (path > 0) {
+    if (path >= 0) {
         cmd += "," + std::to_string(path);
     }
     cmd += "\r";
 
-    return command(cmd, [](uint8_t *d, size_t l) -> CR {
-        std::string_view r(reinterpret_cast<char*>(d), l);
-        if (r.find("+HTTPREADFILE:") != std::string_view::npos) {
-            return CR::OK;
+    return dte->command(cmd, [](uint8_t *d, size_t l) -> CR {
+        const std::string_view response(reinterpret_cast<char *>(d), l);
+        const auto line = detail::find_line(response, "+HTTPREADFILE:");
+        if (!line.empty()) {
+            int errcode = -1;
+            if (!parse_http_errcode(line.substr(std::string_view("+HTTPREADFILE:").size()), errcode)) {
+                return CR::FAIL;
+            }
+            return errcode == 0 ? CR::OK : CR::FAIL;
         }
-        if (r.find("OK")    != std::string_view::npos) return CR::AGAIN;
-        if (r.find("ERROR") != std::string_view::npos) return CR::FAIL;
-        return CR::AGAIN;
+        if (response.find("ERROR") != std::string_view::npos) {
+            return CR::FAIL;
+        }
+        return CR::TIMEOUT;
     }, 120000);
 }
-

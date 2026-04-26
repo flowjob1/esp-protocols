@@ -4,6 +4,7 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 set(EXTRA_COMPONENT_DIRS    # Add esp_modem component and linux port components
         ../..
+        ../../..
         ../../port/linux)
 
 set(COMPONENTS main)

@@ -1,11 +1,24 @@
 #include "a7670e_module.hpp"
-#include <cstring>
+#include "a7670e_parse_utils.hpp"
 
 using namespace esp_modem;
 using namespace a7670e;
 using CR = command_result;
 
-// ── 34. eDRX ─────────────────────────────────────────────────────────────────
+namespace {
+
+CR ok_or_error(std::string_view response)
+{
+    if (response.find("OK") != std::string_view::npos) {
+        return CR::OK;
+    }
+    if (response.find("ERROR") != std::string_view::npos) {
+        return CR::FAIL;
+    }
+    return CR::TIMEOUT;
+}
+
+} // namespace
 
 CR A7670E::edrx_set(int mode, EDrxActType act_type, const std::string &req_value)
 {
@@ -18,61 +31,45 @@ CR A7670E::edrx_set(int mode, EDrxActType act_type, const std::string &req_value
     }
     cmd += "\r";
 
-    return command(cmd, [](uint8_t *d, size_t l) -> CR {
-        std::string_view r(reinterpret_cast<char*>(d), l);
-        if (r.find("OK")    != std::string_view::npos) return CR::OK;
-        if (r.find("ERROR") != std::string_view::npos) return CR::FAIL;
-        return CR::AGAIN;
+    return dte->command(cmd, [](uint8_t *d, size_t l) -> CR {
+        return ok_or_error(std::string_view(reinterpret_cast<char *>(d), l));
     }, 9000);
 }
 
 CR A7670E::edrx_get(EDrxActType &act_type, std::string &req_val)
 {
-    return command("AT+CEDRXS?\r", [&](uint8_t *d, size_t l) -> CR {
-        std::string_view r(reinterpret_cast<char*>(d), l);
-        auto pos = r.find("+CEDRXS:");
-        if (pos != std::string_view::npos) {
-            int act_int;
-            char val_buf[64] = {0};
-            int n = sscanf(r.data() + pos, "+CEDRXS: %d,\"%63[^\"]\"", &act_int, val_buf);
-            if (n >= 1) {
-                act_type = static_cast<EDrxActType>(act_int);
-                if (n >= 2) {
-                    req_val = val_buf;
-                }
+    return dte->command("AT+CEDRXS?\r", [&](uint8_t *d, size_t l) -> CR {
+        const std::string_view response(reinterpret_cast<char *>(d), l);
+        const auto line = detail::find_line(response, "+CEDRXS:");
+        if (!line.empty()) {
+            const auto fields = detail::split_csv(line.substr(std::string_view("+CEDRXS:").size()));
+            int act_value = 0;
+            if (fields.empty() || !detail::parse_integer(fields[0], act_value)) {
+                return CR::FAIL;
             }
+            act_type = static_cast<EDrxActType>(act_value);
+            req_val = fields.size() > 1 ? detail::unquote(fields[1]) : "";
         }
-        if (r.find("OK")    != std::string_view::npos) return CR::OK;
-        if (r.find("ERROR") != std::string_view::npos) return CR::FAIL;
-        return CR::AGAIN;
+        return ok_or_error(response);
     }, 9000);
 }
 
 CR A7670E::edrx_rdp(EDrxParams &params)
 {
-    return command("AT+CEDRXRDP\r", [&](uint8_t *d, size_t l) -> CR {
-        std::string_view r(reinterpret_cast<char*>(d), l);
-        auto pos = r.find("+CEDRXRDP:");
-        if (pos != std::string_view::npos) {
-            int act_int;
-            char req_buf[64] = {0};
-            char nw_buf[64] = {0};
-            char ptw_buf[64] = {0};
-
-            int n = sscanf(r.data() + pos,
-                          "+CEDRXRDP: %d,\"%63[^\"]\",\"%63[^\"]\",\"%63[^\"]\"",
-                          &act_int, req_buf, nw_buf, ptw_buf);
-
-            if (n >= 1) {
-                params.act_type = static_cast<EDrxActType>(act_int);
-                if (n >= 2) params.requested_value = req_buf;
-                if (n >= 3) params.nw_provided_value = nw_buf;
-                if (n >= 4) params.paging_time_window = ptw_buf;
+    return dte->command("AT+CEDRXRDP\r", [&](uint8_t *d, size_t l) -> CR {
+        const std::string_view response(reinterpret_cast<char *>(d), l);
+        const auto line = detail::find_line(response, "+CEDRXRDP:");
+        if (!line.empty()) {
+            const auto fields = detail::split_csv(line.substr(std::string_view("+CEDRXRDP:").size()));
+            int act_value = 0;
+            if (fields.empty() || !detail::parse_integer(fields[0], act_value)) {
+                return CR::FAIL;
             }
+            params.act_type = static_cast<EDrxActType>(act_value);
+            params.requested_value = fields.size() > 1 ? detail::unquote(fields[1]) : "";
+            params.nw_provided_value = fields.size() > 2 ? detail::unquote(fields[2]) : "";
+            params.paging_time_window = fields.size() > 3 ? detail::unquote(fields[3]) : "";
         }
-        if (r.find("OK")    != std::string_view::npos) return CR::OK;
-        if (r.find("ERROR") != std::string_view::npos) return CR::FAIL;
-        return CR::AGAIN;
+        return ok_or_error(response);
     }, 9000);
 }
-

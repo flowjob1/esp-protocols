@@ -11,9 +11,10 @@ namespace a7670e {
 class A7670E : public esp_modem::GenericModule {
     using GenericModule::GenericModule;
 public:
+    using GenericModule::set_operator;
 
     // ── Initialisierung ──────────────────────────────────────────────────────
-    void init_urc_handler(std::shared_ptr<esp_modem::DTE> dte_ref);
+    void init_urc_handler(std::shared_ptr<esp_modem::DTE> dte_ref = nullptr);
 
     // ── 3. Status Control ────────────────────────────────────────────────────
     // mode: -1=execution (AT+CPOF), 0=ordinary, 1=quick
@@ -104,7 +105,7 @@ public:
                                          std::string &data);
     esp_modem::command_result http_read_len(int &total_len);
     esp_modem::command_result http_data_input(const std::string &data,
-                                               int timeout_sec = 1000);
+                                               int timeout_ms = 1000);
     esp_modem::command_result http_post_file(const std::string &filename,
                                               int path = 1,
                                               std::optional<HttpMethod> method = {},
@@ -231,5 +232,7 @@ private:
                                                       uint32_t timeout_ms);
 };
 
-} // namespace a7670e
+std::unique_ptr<esp_modem::DCE> create_a7670e_dce(const esp_modem::dce_config *dce_cfg,
+                                                   const esp_modem::dte_config *dte_cfg);
 
+} // namespace a7670e
